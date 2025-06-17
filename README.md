@@ -127,6 +127,5 @@ The editor relies on modern browser APIs such as `FileReader`, `drag and drop` a
 Pull requests are welcome! Feel free to open an issue for feature requests or problems you encounter.
 
 ## License
-
-This project is provided without a specific license. If you plan to use it in a commercial setting, please contact the author.
+Released under the [MIT License](LICENSE).
 
