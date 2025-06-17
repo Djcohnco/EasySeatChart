@@ -130,5 +130,5 @@ Pull requests are welcome! Feel free to open an issue for feature requests or pr
 Released under the [MIT License](LICENSE).
 
 ## Support
-If you want to support me, feel free to [buy me a coffee](coff.ee/djcohn)!
+If you want to support me, feel free to [buy me a coffee](https://coff.ee/djcohn)!
 
