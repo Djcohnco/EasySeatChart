@@ -1,0 +1,359 @@
+/* --- Import a modern font from Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+/* --- Define a cohesive color palette and variables --- */
+:root {
+    --bg-color: #f8f9fa;
+    --surface-color: #ffffff;
+    --primary-text-color: #212529;
+    --secondary-text-color: #6c757d;
+    --border-color: #dee2e6;
+    --accent-color: #0d6efd; /* A nice, modern blue */
+    --accent-color-light: #cfe2ff;
+    --danger-color: #dc3545;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --border-radius-sm: 0.25rem; /* 4px */
+    --border-radius-md: 0.5rem;  /* 8px */
+}
+
+.hidden {
+    display: none;
+}
+
+/* Ensure hidden class works on modal backdrop */
+#modalBackdrop.hidden {
+    display: none;
+}
+
+/* Modal styles */
+#modalBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-box {
+    background: var(--surface-color);
+    padding: 20px;
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-md);
+    max-width: 320px;
+    width: 90%;
+}
+
+.modal-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* --- Global Styles & Resets --- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--primary-text-color);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 95%;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+h1, h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+h1 {
+    font-size: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-top: 2rem;
+}
+
+/* --- Styled Form Elements (Buttons, Inputs) --- */
+button,
+input[type="file"]::file-selector-button,
+select,
+input[type="number"] {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--surface-color);
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease-in-out;
+}
+
+button {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+button:hover {
+    opacity: 0.85;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Style for all destructive action buttons */
+#removeItem,
+.delete-button {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-color-light);
+}
+
+/* --- Control Sections --- */
+#roomConfig,
+.ballroom-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 1rem;
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+/* Make inputs in controls a bit smaller */
+#roomConfig > *, .ballroom-controls > * {
+    margin: 0;
+}
+
+#roomConfig label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 500;
+    font-size: 0.9rem;
+    gap: 4px;
+}
+
+#roomStats {
+    margin-left: auto;
+    font-weight: 600;
+}
+
+/* --- Main Layout --- */
+.layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    margin-top: 1.5rem;
+}
+
+.ballroom {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    width: 800px;
+    height: 600px;
+    min-width: 200px;
+    min-height: 200px;
+    position: relative;
+    /* THIS IS THE FIX: Use the main background color for the floor */
+    background-color: var(--bg-color);
+    box-shadow: var(--shadow-md);
+    overflow: auto; /* Keep this */
+    resize: both; /* And this */
+}
+
+/* --- Ballroom Objects --- */
+.table, .bar, .stage, .dancefloor {
+    position: absolute;
+    cursor: move;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-md);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: box-shadow 0.2s, outline 0.2s;
+}
+
+.table {
+    border: 2px solid var(--primary-text-color);
+    /* This now contrasts with the ballroom's background */
+    background: var(--surface-color);
+    color: var(--primary-text-color);
+}
+.table.round {
+    border-radius: 50%;
+}
+
+.chair {
+    width: 22px;
+    height: 22px;
+    background: #e9ecef;
+    position: absolute;
+    text-align: center;
+    line-height: 22px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 3px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.chair:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-md);
+}
+
+/* Differentiating other room items */
+.bar { background-color: #fff0d4; border: 2px dashed #e4a74f; }
+.stage { background-color: #e3ddeb; border: 2px dashed #907ca7; }
+.dancefloor { background-color: #d1e7dd; border: 2px dashed #59a37c; }
+
+.resizable {
+    resize: both;
+    overflow: hidden; /* Hide overflow within resizable elements */
+}
+.ballroom.resizable {
+    overflow: auto; /* Except for the ballroom itself */
+}
+
+.assign-dropdown {
+    position: absolute;
+    z-index: 1000;
+    padding: 8px;
+    border: 1px solid var(--accent-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-md);
+}
+
+.selected {
+    outline: 3px solid var(--accent-color);
+    box-shadow: 0 0 10px var(--accent-color-light);
+}
+
+/* --- Table Details Panel --- */
+.table-details {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    flex: 1; /* Allow it to grow */
+    min-width: 320px;
+    max-width: 400px;
+    padding: 16px;
+    background: var(--surface-color);
+    box-shadow: var(--shadow-md);
+    max-height: 600px; /* Match ballroom height */
+    overflow-y: auto;
+}
+
+.table-controls {
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.table-controls label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 500;
+    font-size: 0.9rem;
+    gap: 4px;
+}
+
+.table-controls input,
+.table-controls select,
+.table-controls button {
+    width: 100%;
+    margin: 0;
+}
+
+/* Guest list table in details panel */
+.table-details table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.table-details th,
+.table-details td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-details th {
+    font-weight: 600;
+    background-color: var(--bg-color);
+}
+
+/* Spacer row for party groups */
+.table-details td[colspan="3"] {
+    padding: 0;
+    border-bottom: 2px solid #adb5bd; /* Make party separator more distinct */
+}
+
+#unseatedList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#unseatedList li {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface-color);
+    cursor: grab;
+    user-select: none;
+}
+
+#unseatedList li.party-bg-1 {
+    background: #f1f1f1;
+}
+
+.toast {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 3000;
+}

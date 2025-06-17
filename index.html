@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wedding Seating Chart Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+    <h1>Wedding Seating Chart Editor</h1>
+
+    <details id="fileMenu">
+        <summary>File Options</summary>
+        <div class="menu-content">
+            <input type="file" id="guestFile" accept=".csv,.xlsx" />
+            <button id="loadGuests" title="Load a guest list from a CSV or XLSX file">Load Guests</button>
+            <button id="exportGuests" title="Download the current guest list with table assignments">Export Guest List</button>
+            <input type="file" id="configFile" accept=".json" />
+            <button id="loadConfig" title="Load a previously saved seating layout">Load Layout</button>
+            <button id="saveConfig" title="Save the current seating layout to a JSON file">Save Layout</button>
+            <p>Upload a guest list CSV. Lists exported from popular sites like The Knot or Zola are supported, as well as the default "Party ID, Guest Name, Responded, RSVP Response" format.</p>  
+        </div>
+    </details>
+
+    <div id="guestStatus"></div>
+
+    <h2>Room Configuration</h2>
+    <div id="roomConfig">
+        <label>Item Type
+            <select id="itemType">
+                <option value="table">Table</option>
+                <option value="bar">Bar</option>
+                <option value="dancefloor">Dancefloor</option>
+                <option value="stage">Stage</option>
+            </select>
+        </label>
+        <label>Table Shape
+            <select id="tableShape">
+                <option value="square">Square</option>
+                <option value="rectangular">Rectangle</option>
+                <option value="round">Round</option>
+            </select>
+        </label>
+        <label>Seats per Table
+            <input type="number" id="seatCount" min="1" value="8">
+        </label>
+        <label>Number to Add
+            <input type="number" id="itemCount" min="1" value="1">
+        </label>
+        <button id="addItem">Add Item</button>
+        <button id="removeItem" class="delete-button">Remove Selected</button>
+        <div id="roomStats"></div>
+    </div>
+
+    <h2>Ballroom</h2>
+    <div class="ballroom-controls">
+        <button id="clearSeats" class="delete-button" title="Remove all guests from their seats">Clear Seats</button>
+        <button id="clearLayout" class="delete-button" title="Reset the entire layout and guest list">Clear Layout</button>
+        <button id="autocomplete" title="Automatically seat all remaining guests">Autocomplete</button>
+        <button id="undoAction" title="Undo the most recent change">Undo</button>
+    </div>
+    <div class="layout">
+        <div id="ballroom" class="ballroom resizable"></div>
+        <div id="tableDetails" class="table-details"></div>
+    </div>
+</div>
+
+<div id="modalBackdrop" class="hidden">
+    <div class="modal-box">
+        <div id="modalMessage"></div>
+        <div id="modalInputContainer"></div>
+        <div id="modalButtons" class="modal-buttons"></div>
+    </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+    <script src="script.js"></script>
+</body>
+</html>
