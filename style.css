@@ -63,11 +63,45 @@
 body {
     font-family: 'Poppins', Arial, sans-serif;
     margin: 0;
-    padding: 0;
+    padding: 60px 0 0 0;
     background-color: var(--bg-color);
     color: var(--primary-text-color);
     font-size: 16px;
     line-height: 1.5;
+}
+
+.site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface-color);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 10px 20px;
+    z-index: 1000;
+}
+
+.login-btn {
+    background-color: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 4px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.save-status {
+    margin-left: 1rem;
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
+}
+
+.login-btn:hover {
+    opacity: 0.85;
 }
 
 .container {
@@ -92,6 +126,43 @@ h1 {
 h2 {
     font-size: 1.5rem;
     margin-top: 2rem;
+}
+
+/* --- File Menu --- */
+#fileMenu {
+    margin-bottom: 1.5rem;
+}
+
+#fileMenu summary {
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+
+#fileMenu[open] summary {
+    margin-bottom: 0.75rem;
+}
+
+#fileMenu .menu-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+#fileMenu .file-input {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.9rem;
+    gap: 4px;
+}
+
+#fileMenu .hint {
+    grid-column: 1 / -1;
+    font-size: 0.85rem;
+    color: var(--secondary-text-color);
+    margin-top: 4px;
 }
 
 /* --- Styled Form Elements (Buttons, Inputs) --- */
@@ -135,36 +206,31 @@ input:focus, select:focus {
 }
 
 /* --- Control Sections --- */
-#roomConfig,
 .ballroom-controls {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 10px;
     align-items: center;
-    padding: 1rem;
+    padding: 0.5rem;
     background-color: var(--surface-color);
     border-radius: var(--border-radius-md);
     box-shadow: var(--shadow-sm);
-    margin-bottom: 1.5rem;
 }
 
-/* Make inputs in controls a bit smaller */
-#roomConfig > *, .ballroom-controls > * {
+.ballroom-controls > * {
     margin: 0;
 }
 
-#roomConfig label {
+.ballroom-controls button {
+    width: 36px;
+    height: 36px;
+    padding: 0;
     display: flex;
-    flex-direction: column;
-    font-weight: 500;
-    font-size: 0.9rem;
-    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
 }
 
-#roomStats {
-    margin-left: auto;
-    font-weight: 600;
-}
 
 /* --- Main Layout --- */
 .layout {
@@ -345,6 +411,19 @@ input:focus, select:focus {
     background: #f1f1f1;
 }
 
+.no-rsvp {
+    color: var(--danger-color);
+}
+
+#guestSearch {
+    width: 100%;
+    margin: 0 0 8px 0;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+}
+
 .toast {
     position: fixed;
     bottom: 1rem;
@@ -356,4 +435,95 @@ input:focus, select:focus {
     border-radius: var(--border-radius-sm);
     box-shadow: var(--shadow-md);
     z-index: 3000;
+}
+
+
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: inline-block;
+    }
+}
+
+.site-footer {
+    margin-top: 2rem;
+    padding: 1rem 0;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--secondary-text-color);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
+    }
+    .layout {
+        flex-direction: column;
+    }
+    .ballroom {
+        width: 100%;
+        height: 400px;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    .ballroom.mobile-expanded {
+        max-width: none;
+        overflow: auto;
+    }
+    .table-details {
+        max-width: 100%;
+        max-height: none;
+        width: 100%;
+    }
+}
+
+/* Fullscreen ballroom styles */
+.ballroom:fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none;
+    max-height: none;
+}
+
+/* Mobile fullscreen toolbar */
+.fullscreen-controls {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.fullscreen-controls button {
+    pointer-events: auto;
+    margin: 0 2px;
+}
+
+.fullscreen-controls .add-menu {
+    position: relative;
+    pointer-events: auto;
+}
+
+#addMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    pointer-events: auto;
+    display: flex;
+    gap: 4px;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+}
+#addMenu.hidden {
+    display: none;
 }
