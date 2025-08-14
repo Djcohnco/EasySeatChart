@@ -7,10 +7,231 @@ const CHAIR_GAP = 5;
 
 let undoStack = [];
 let tableClipboard = null;
+let currentUser = null;
+let lastSavedAt = null;
+let saveTimer = null;
+
+function updateSaveStatus(text) {
+    const el = document.getElementById('saveStatus');
+    if (el) el.textContent = text || '';
+}
+
+function scheduleCloudSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+        const data = serializeConfig();
+        try {
+            localStorage.setItem('weddingLayout', JSON.stringify(data));
+        } catch (err) {
+            console.error('Failed to store layout', err);
+        }
+        if (currentUser) {
+            saveToCloud(data);
+        }
+    }, 1000);
+}
+
+function parseJwt(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+}
+
+function isBase64(str) {
+    return /^[A-Za-z0-9+/]+={0,2}$/.test(str) && str.length % 4 === 0;
+}
+
+function decodeData(data) {
+    let result = data;
+    while (typeof result === 'string' || (result && typeof result.value === 'string')) {
+        if (result && typeof result.value === 'string') {
+            result = result.value;
+            continue;
+        }
+        let str = result.trim();
+        if (!str.startsWith('{') && !str.startsWith('[') && isBase64(str)) {
+            try { str = atob(str); } catch { break; }
+        }
+        try {
+            result = JSON.parse(str);
+        } catch {
+            break;
+        }
+    }
+    return result;
+}
+
+async function saveToCloud(data) {
+    if (!currentUser) return;
+    try {
+        updateSaveStatus('Saving...');
+        const res = await fetch('/api/layout', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({layout: data, user: currentUser})
+        });
+        if (res.ok) {
+            const json = await res.json();
+            lastSavedAt = json.savedAt || Date.now();
+            const t = new Date(lastSavedAt).toLocaleTimeString();
+            updateSaveStatus('Saved ' + t);
+        } else {
+            updateSaveStatus('Save failed');
+        }
+    } catch (err) {
+        console.error('Failed to save layout to cloud', err);
+        updateSaveStatus('Save failed');
+    }
+}
+
+async function loadFromCloud() {
+    if (!currentUser) return null;
+    try {
+        const res = await fetch('/api/layout?user=' + encodeURIComponent(JSON.stringify(currentUser)));
+        if (res.ok) {
+            const json = await res.json();
+            lastSavedAt = json.savedAt || null;
+            if (lastSavedAt) {
+                const t = new Date(lastSavedAt).toLocaleTimeString();
+                updateSaveStatus('Saved ' + t);
+            }
+            let layout = decodeData(json.layout);
+            if (!layout && (json.ballroom || json.tables || json.guests)) {
+                layout = json;
+            }
+            if (layout) {
+                try {
+                    localStorage.setItem('weddingLayout', JSON.stringify(layout));
+                } catch (e) {
+                    console.error('Failed to store layout', e);
+                }
+            }
+            return layout || null;
+        }
+    } catch (err) {
+        console.error('Failed to load layout from cloud', err);
+    }
+    return null;
+}
+
+function updateLoginUI() {
+    const container = document.getElementById('loginButton');
+    const loadBtn = document.getElementById('loadCloudLayoutBtn');
+    if (!container) return;
+    container.innerHTML = '';
+    if (currentUser) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Logout';
+        btn.className = 'login-btn';
+        btn.addEventListener('click', () => {
+            currentUser = null;
+            google.accounts.id.disableAutoSelect();
+            localStorage.removeItem('currentUser');
+            resetLayoutMemory();
+            updateLoginUI();
+        });
+        const span = document.createElement('span');
+        span.textContent = ' ' + (currentUser.name || currentUser.email || '');
+        container.appendChild(btn);
+        container.appendChild(span);
+        if (loadBtn) loadBtn.classList.remove('hidden');
+    } else {
+        google.accounts.id.renderButton(container, { theme: 'outline', size: 'medium' });
+        const emailBtn = document.createElement('button');
+        emailBtn.textContent = 'Email Login';
+        emailBtn.className = 'login-btn';
+        emailBtn.style.marginLeft = '0.5rem';
+        emailBtn.addEventListener('click', () => {
+            const email = prompt('Enter email');
+            if (email) {
+                currentUser = { email };
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                updateLoginUI();
+                loadCloudLayout();
+            }
+        });
+        container.appendChild(emailBtn);
+        if (loadBtn) loadBtn.classList.add('hidden');
+    }
+}
+
+function handleCredentialResponse(response) {
+    const data = parseJwt(response.credential);
+    if (data) {
+        currentUser = { id: data.sub, name: data.name, email: data.email };
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        updateLoginUI();
+        loadCloudLayout();
+    }
+}
+
+function initAuth() {
+    const saved = localStorage.getItem('currentUser');
+    if (saved) {
+        try { currentUser = JSON.parse(saved); } catch (e) { currentUser = null; }
+    }
+    if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.initialize({
+            client_id: 'YOUR_GOOGLE_CLIENT_ID',
+            callback: handleCredentialResponse
+        });
+    }
+    updateLoginUI();
+    if (currentUser) loadCloudLayout();
+}
+
+async function loadCloudLayout() {
+    const data = await loadFromCloud();
+    if (data && data.ballroom) {
+        try {
+            loadConfig(data);
+        } catch (e) {
+            console.error('Failed to load layout from cloud', e);
+        }
+    }
+}
+
+async function loadInitialLayout() {
+    let local = localStorage.getItem('weddingLayout');
+    if (local === 'undefined' || local === 'null') local = null;
+    if (currentUser) {
+        const cloud = await loadFromCloud();
+        if (cloud) {
+            loadConfig(cloud);
+            return;
+        } else if (local) {
+            const cfg = decodeData(local);
+            if (cfg) {
+                try {
+                    loadConfig(cfg);
+                } catch (err) {
+                    console.error('Failed to load saved layout', err);
+                }
+            }
+        }
+    } else if (local) {
+        const cfg = decodeData(local);
+        if (cfg) {
+            try {
+                loadConfig(cfg);
+            } catch (err) {
+                console.error('Failed to load saved layout', err);
+            }
+        }
+    }
+}
 
 function pushUndo(message = 'action') {
     undoStack.push({ state: serializeConfig(), message });
     if (undoStack.length > 20) undoStack.shift();
+    scheduleCloudSave();
 }
 
 function showToast(msg) {
@@ -93,6 +314,41 @@ function confirmHeads(multiple) {
         });
     }
     return confirmModal('Use the heads of the table for seating?');
+}
+
+function chooseTableShape() {
+    return showModal('Select table shape', {
+        buttons: [
+            { label: 'Square', value: 'square' },
+            { label: 'Rectangle', value: 'rectangular' },
+            { label: 'Round', value: 'round' }
+        ]
+    });
+}
+
+async function mobileAddTable() {
+    let shape = await chooseTableShape();
+    if (!shape) return;
+    let seats = await promptModal('Seats per table?', '8');
+    seats = parseInt(seats, 10);
+    if (isNaN(seats) || seats < 1) seats = 1;
+    let count = await promptModal('How many tables?', '1');
+    count = parseInt(count, 10);
+    if (isNaN(count) || count < 1) count = 1;
+    let useHeads = false;
+    let headSeats = 0;
+    if (shape === 'rectangular') {
+        useHeads = await confirmHeads(count > 1);
+        if (useHeads) {
+            const hs = await promptModal('How many chairs fit at each head?', '1');
+            headSeats = parseInt(hs, 10);
+            if (isNaN(headSeats)) headSeats = 0;
+        }
+    }
+    for (let i = 0; i < count; i++) {
+        createTable(seats, shape, { useHeads, headSeats });
+    }
+    updateRoomStats();
 }
 
 function selectItem(el) {
@@ -335,6 +591,8 @@ function handleGuestFile() {
     loadGuestsFromFile(file);
 }
 
+initAuth();
+
 document.getElementById('loadGuests').addEventListener('click', handleGuestFile);
 
 function exportGuestList() {
@@ -376,38 +634,43 @@ function exportGuestList() {
 
 document.getElementById('exportGuests').addEventListener('click', exportGuestList);
 
-document.getElementById('itemType').addEventListener('change', () => {
-    const type = document.getElementById('itemType').value;
-    const show = type === 'table';
-    document.getElementById('tableShape').style.display = show ? '' : 'none';
-    document.getElementById('seatCount').style.display = show ? '' : 'none';
-    document.getElementById('itemCount').style.display = show ? '' : 'none';
-});
-document.getElementById('itemType').dispatchEvent(new Event('change'));
+const itemTypeEl = document.getElementById('itemType');
+const addItemBtn = document.getElementById('addItem');
+if (itemTypeEl && addItemBtn) {
+    itemTypeEl.addEventListener('change', () => {
+        const type = itemTypeEl.value;
+        const show = type === 'table';
+        const shapeLabel = document.getElementById('tableShape').parentElement;
+        const seatsLabel = document.getElementById('seatCount').parentElement;
+        shapeLabel.style.display = show ? '' : 'none';
+        seatsLabel.style.display = show ? '' : 'none';
+    });
+    itemTypeEl.dispatchEvent(new Event('change'));
 
-document.getElementById('addItem').addEventListener('click', async () => {
-    pushUndo('Add item');
-    const type = document.getElementById('itemType').value;
-    if (type === 'table') {
-        const shape = document.getElementById('tableShape').value;
-        const seats = parseInt(document.getElementById('seatCount').value);
-        const count = parseInt(document.getElementById('itemCount').value);
-        let useHeads = false;
-        let headSeats = 0;
-        if (shape === 'rectangular') {
-            useHeads = await confirmHeads(count > 1);
-            if (useHeads) {
-                const hs = await promptModal('How many chairs fit at each head?', '1');
-                headSeats = parseInt(hs, 10);
-                if (isNaN(headSeats)) headSeats = 0;
+    addItemBtn.addEventListener('click', async () => {
+        pushUndo('Add item');
+        const type = itemTypeEl.value;
+        if (type === 'table') {
+            const shape = document.getElementById('tableShape').value;
+            const seats = parseInt(document.getElementById('seatCount').value);
+            const count = parseInt(document.getElementById('itemCount').value);
+            let useHeads = false;
+            let headSeats = 0;
+            if (shape === 'rectangular') {
+                useHeads = await confirmHeads(count > 1);
+                if (useHeads) {
+                    const hs = await promptModal('How many chairs fit at each head?', '1');
+                    headSeats = parseInt(hs, 10);
+                    if (isNaN(headSeats)) headSeats = 0;
+                }
             }
+            for (let i = 0; i < count; i++) createTable(seats, shape, { useHeads, headSeats });
+        } else {
+            createRect(type);
         }
-        for (let i=0; i<count; i++) createTable(seats, shape, { useHeads, headSeats });
-    } else {
-        createRect(type);
-    }
-    updateRoomStats();
-});
+        updateRoomStats();
+    });
+}
 
 function getTableDimensions(seats, shape, opts = {}) {
     let width, height;
@@ -502,11 +765,13 @@ function createChairs(tableObj, count) {
 
 function makeDraggable(el) {
     const ballroom = document.getElementById('ballroom');
-    let offsetX, offsetY, dragging = false;
+    let offsetX, offsetY, dragging = false, startX = 0, startY = 0;
     el.addEventListener('mousedown', e => {
         dragging = true;
         offsetX = e.offsetX;
         offsetY = e.offsetY;
+        startX = parseInt(el.style.left || '0');
+        startY = parseInt(el.style.top || '0');
     });
     document.addEventListener('mousemove', e => {
         if (!dragging) return;
@@ -519,7 +784,16 @@ function makeDraggable(el) {
         el.style.top = y + 'px';
         repositionChairs(el);
     });
-    document.addEventListener('mouseup', () => dragging = false);
+    document.addEventListener('mouseup', () => {
+        if (dragging) {
+            dragging = false;
+            const x = parseInt(el.style.left || '0');
+            const y = parseInt(el.style.top || '0');
+            if (x !== startX || y !== startY) {
+                pushUndo('Move item');
+            }
+        }
+    });
 }
 
 function repositionChairs(tableEl) {
@@ -659,28 +933,42 @@ function unseatedGuests() {
         .map(g => ({
             id: g.__id,
             name: g['Guest Name'],
-            party: g['Party ID'] || ''
+            party: g['Party ID'] || '',
+            rsvped: (g['RSVP Response'] || '').toLowerCase() === 'yes'
         }));
 }
 
 function showUnseatedGuests() {
     const panel = document.getElementById('tableDetails');
     if (!panel) return;
+    const currentSearch = panel.querySelector('#guestSearch')?.value || '';
     panel.innerHTML = '';
+    const all = unseatedGuests();
     const header = document.createElement('h3');
-    header.textContent = 'Unseated Guests';
+    header.textContent = `Unseated Guests (${all.length})`;
     panel.appendChild(header);
+
+    const search = document.createElement('input');
+    search.id = 'guestSearch';
+    search.type = 'text';
+    search.placeholder = 'Search guest...';
+    search.value = currentSearch;
+    search.addEventListener('input', () => showUnseatedGuests());
+    panel.appendChild(search);
+
     const list = document.createElement('ul');
     list.id = 'unseatedList';
     let lastParty = null;
     let colorIndex = -1; // start at -1 so first party increments to 0
-    unseatedGuests().forEach(({id, name, party}) => {
+    all.forEach(({id, name, party, rsvped}) => {
+        if (currentSearch && !name.toLowerCase().includes(currentSearch.toLowerCase())) return;
         if (party !== lastParty) {
             colorIndex++;
             lastParty = party;
         }
         const li = document.createElement('li');
-        li.textContent = name;
+        li.textContent = name + (rsvped ? '' : ' *');
+        if (!rsvped) li.classList.add('no-rsvp');
         li.dataset.id = id;
         li.classList.add(`party-bg-${colorIndex % 2}`);
         li.draggable = true;
@@ -708,7 +996,13 @@ async function seatGuest(chair, id, skipUndo = false) {
     const guest = guests.find(g => g.__id === id);
     const name = guest ? guest['Guest Name'] : id;
     chair.dataset.guestName = name;
-    chair.textContent = initials(name);
+    const rsvped = guest ? (guest['RSVP Response'] || '').toLowerCase() === 'yes' : false;
+    const init = initials(name);
+    if (rsvped) {
+        chair.textContent = init;
+    } else {
+        chair.innerHTML = `${init}<span class="no-rsvp">*</span>`;
+    }
     const partyId = guest ? guest['Party ID'] : '';
     chair.dataset.party = partyId;
     if (tableObj) {
@@ -951,7 +1245,8 @@ function serializeConfig() {
 
 function clearBallroom() {
     const ballroom = document.getElementById('ballroom');
-    while (ballroom.firstChild) ballroom.removeChild(ballroom.firstChild);
+    if (!ballroom) return;
+    ballroom.querySelectorAll('.table, .chair, .bar, .stage, .dancefloor').forEach(el => el.remove());
     tables = [];
 }
 
@@ -1014,7 +1309,17 @@ function loadConfig(config) {
             ch.dataset.guest = guestObj.__id || seat.guest;
             ch.dataset.guestName = guestObj['Guest Name'] || seat.guest;
             ch.dataset.party = seat.party;
-            ch.textContent = seat.guest ? initials(ch.dataset.guestName) : '';
+            if (seat.guest) {
+                const rsvped = (guestObj['RSVP Response'] || '').toLowerCase() === 'yes';
+                const init = initials(ch.dataset.guestName);
+                if (rsvped) {
+                    ch.textContent = init;
+                } else {
+                    ch.innerHTML = `${init}<span class="no-rsvp">*</span>`;
+                }
+            } else {
+                ch.textContent = '';
+            }
             if (seat.party) {
                 if (!tableObj.partyColors[seat.party]) {
                     tableObj.partyColors[seat.party] = generateColor(tableObj.partyColors);
@@ -1071,6 +1376,8 @@ function handleConfigFile() {
 
 document.getElementById('saveConfig').addEventListener('click', saveConfig);
 document.getElementById('loadConfig').addEventListener('click', handleConfigFile);
+const loadCloudBtnEl = document.getElementById('loadCloudLayoutBtn');
+if (loadCloudBtnEl) loadCloudBtnEl.addEventListener('click', loadCloudLayout);
 document.getElementById('clearSeats').addEventListener('click', async () => {
     if (await confirmModal('Clear all seat assignments?')) {
         clearAllSeats();
@@ -1087,13 +1394,97 @@ document.getElementById('autocomplete').addEventListener('click', () => {
 });
 document.getElementById('undoAction').addEventListener('click', undoLast);
 
-document.addEventListener('DOMContentLoaded', () => {
+function openBallroomFullscreen() {
+    const ballroom = document.getElementById('ballroom');
+    const controls = document.getElementById('fullscreenControls');
+    ballroom.classList.add('mobile-expanded');
+    if (ballroom.requestFullscreen) {
+        ballroom.requestFullscreen().catch(() => {});
+    } else if (ballroom.webkitRequestFullscreen) {
+        ballroom.webkitRequestFullscreen();
+    } else if (ballroom.msRequestFullscreen) {
+        ballroom.msRequestFullscreen();
+    }
+    controls.classList.remove('hidden');
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+    }
+}
+
+function closeBallroomFullscreen() {
+    const ballroom = document.getElementById('ballroom');
+    const controls = document.getElementById('fullscreenControls');
+    controls.classList.add('hidden');
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    ballroom.classList.remove('mobile-expanded');
+    if (screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) {}
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        const controls = document.getElementById('fullscreenControls');
+        const ballroom = document.getElementById('ballroom');
+        controls.classList.add('hidden');
+        ballroom.classList.remove('mobile-expanded');
+        if (screen.orientation && screen.orientation.unlock) {
+            try { screen.orientation.unlock(); } catch (e) {}
+        }
+    }
+});
+
     const ballroom = document.getElementById('ballroom');
     ballroom.style.minWidth = ballroom.offsetWidth + 'px';
     ballroom.style.minHeight = ballroom.offsetHeight + 'px';
     ballroom.addEventListener('click', e => {
-        if (e.target === ballroom) selectItem(null);
+        if (e.target === ballroom) {
+            if (window.innerWidth <= 768 && !ballroom.classList.contains('mobile-expanded')) {
+                openBallroomFullscreen();
+            } else {
+                selectItem(null);
+            }
+        }
     });
+
+    const fsCloseBtn = document.getElementById("fsClose");
+    if (fsCloseBtn) fsCloseBtn.addEventListener("click", closeBallroomFullscreen);
+    const fsDeleteBtn = document.getElementById("fsDelete");
+    if (fsDeleteBtn) fsDeleteBtn.addEventListener("click", deleteSelectedItem);
+    const fsUndoBtn = document.getElementById("fsUndo");
+    if (fsUndoBtn) fsUndoBtn.addEventListener("click", undoLast);
+    const fsAutoBtn = document.getElementById("fsAutocomplete");
+    if (fsAutoBtn) {
+        fsAutoBtn.addEventListener("click", () => {
+            pushUndo("Autocomplete seating");
+            autocompleteSeating();
+        });
+    }
+    const addMenuBtn = document.getElementById('openAddMenu');
+    const addMenu = document.getElementById('addMenu');
+    if (addMenuBtn && addMenu) {
+        addMenuBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            addMenu.classList.toggle('hidden');
+        });
+
+        addMenu.addEventListener('click', async e => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const type = btn.dataset.type;
+            if (type === 'table') {
+                pushUndo('Add item');
+                await mobileAddTable();
+            } else {
+                pushUndo('Add item');
+                createRect(type);
+                updateRoomStats();
+            }
+            addMenu.classList.add('hidden');
+        });
+    }
     document.addEventListener('dragover', e => e.preventDefault());
     document.addEventListener('drop', e => {
         e.preventDefault();
@@ -1145,18 +1536,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
         }
     });
-    const saved = localStorage.getItem('weddingLayout');
-    if (saved) {
-        try {
-            const config = JSON.parse(saved);
-            loadConfig(config);
-        } catch (err) {
-            console.error('Failed to load saved layout', err);
-        }
-    }
+    loadInitialLayout();
     showUnseatedGuests();
     updateRoomStats();
-});
 
 function deleteSelectedItem() {
     if (!selectedItem) return;
@@ -1173,12 +1555,23 @@ function deleteSelectedItem() {
     updateRoomStats();
 }
 
-document.getElementById('removeItem').addEventListener('click', deleteSelectedItem);
+const removeItemBtn = document.getElementById('removeItem');
+if (removeItemBtn) {
+    removeItemBtn.addEventListener('click', deleteSelectedItem);
+}
 
 window.addEventListener('beforeunload', () => {
     try {
         const data = serializeConfig();
         localStorage.setItem('weddingLayout', JSON.stringify(data));
+        if (currentUser) {
+            const payload = JSON.stringify({layout: data, user: currentUser});
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon('/api/layout', new Blob([payload], {type:'application/json'}));
+            } else {
+                saveToCloud(data);
+            }
+        }
     } catch (err) {
         console.error('Failed to store layout', err);
     }
